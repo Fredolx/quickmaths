@@ -12,38 +12,34 @@ void AI::Initialize()
 {
     if (model != nullptr)
     {
+        std::cout << "Initialized skipped" << std::endl;
         return;
     }
     model = OgaModel::Create("/data/data/com.example.quickmaths/files/model");
     tokenizer = OgaTokenizer::Create(*model);
     params = OgaGeneratorParams::Create(*model);
-    params->SetSearchOption("max_length", 200);
+    params->SetSearchOption("max_length", 250);
+    std::cout << "Initialized model" << std::endl;
 }
 
 std::string AI::Generate(std::string input)
 {
     auto sequences = OgaSequences::Create();
     input = std::format(R"(
-        Convert the following text into a mathematical equation.
+        Convert the following text into a computer-readable mathematical equation.
         Output only the equation, without any explanation.
-
-        Example:
-        Input: 500 from 250 in %
-        Output: 500 / 250 * 100
-
-        Input: 7 to 10 in percentage
-        Output: (10 - 7) / 7 * 100
-
-        Input: 4.5 LB for 20$, what is it in $ per pound
-        Output: 20 / 4.5
-
-        Input: 7 oz for 20$ in $/lb
-        Output: 20 * (16 / 7)
-
-        Input: {}
-        Output: )",
+        Input: What is the % increase of 5 to 10
+        Output: (10 - 5) / 5 * 100
+        Input: 5 ounces to pounds
+        Output: 5 / 16
+        Input: 20$ for 5 ounces in $/lb
+        Output: 20 / (5 / 16)
+        Input: 24 pounds for 36$ in $/lb
+        Output: 36 / 24
+        Input: 5 lb to kg
+        Out)",
                         input);
-    input = std::format("<|user|>\n{} <|end|>\n<|assistant|>", input);
+    input = std::format("<|user|>{}\n <|end|>\n<|assistant|>", input);
     tokenizer->Encode(input.c_str(), *sequences);
     auto generator = OgaGenerator::Create(*model, *params);
     generator->AppendTokenSequences(*sequences);

@@ -75,6 +75,7 @@ StringDouble getResultWork(String query) {
 class _MyHomePageState extends State<MyHomePage> {
   double? lastResult;
   String? lastEquation;
+  String? lastPrompt;
   final TextEditingController _controller = TextEditingController();
   @override
   void initState() {
@@ -86,6 +87,7 @@ class _MyHomePageState extends State<MyHomePage> {
   calculate() async {
     var query = _controller.text;
     setState(() {
+      lastPrompt = query;
       _controller.clear();
     });
     context.loaderOverlay.show();
@@ -108,8 +110,9 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       body: LoaderOverlay(
         child: Padding(
-          padding: EdgeInsets.all(50),
+          padding: EdgeInsets.fromLTRB(30, 200, 30, 0),
           child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextField(
                 controller: _controller,
@@ -118,12 +121,10 @@ class _MyHomePageState extends State<MyHomePage> {
                   hintText: "Try typing '% increase of 10 to 30'",
                 ),
               ),
-              SizedBox(height: 40),
+              SizedBox(height: 30),
               Text(
-                lastEquation != null
-                    ? "Equation: $lastEquation\nResult: $lastResult"
-                    : "",
-                style: TextStyle(fontSize: 14),
+                "Prompt: ${lastPrompt ?? ""}\nEquation: ${lastEquation ?? ""}\nResult: ${lastResult ?? ""}",
+                style: TextStyle(fontSize: 16),
               ),
             ],
           ),
