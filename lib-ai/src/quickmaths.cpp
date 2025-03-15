@@ -7,10 +7,24 @@
 
 extern "C"
 {
-    double GetResult(std::string query)
+    StringDouble GetResult(const char *query)
     {
-        auto result = AI::Generate(query);
-        return Calculate(result);
+        try
+        {
+            std::string queryStr(query);
+            auto result = AI::Generate(queryStr);
+            auto resultNum = Calculate(result);
+            return {strdup(result.c_str()), resultNum};
+        }
+        catch (const std::exception &e)
+        {
+            std::cerr << "Caught exception: " << e.what() << std::endl;
+        }
+        catch (...)
+        {
+            std::cerr << "Caught unknown exception" << std::endl;
+        }
+        return {"No dice", -1};
     }
 
     double Calculate(std::string expression)

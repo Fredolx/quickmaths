@@ -3,7 +3,12 @@
 
 extern "C"
 {
-    double GetResult(std::string);
+    struct StringDouble
+    {
+        const char *text;
+        double value;
+    };
+    StringDouble GetResult(const char *query);
     double Calculate(std::string);
     void Shutdown();
     void Initialize();

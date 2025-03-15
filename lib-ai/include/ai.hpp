@@ -12,7 +12,6 @@ public:
     static std::string Generate(std::string);
 
 private:
-    static std::unique_ptr<OgaGenerator> generator;
     static std::unique_ptr<OgaModel> model;
     static std::unique_ptr<OgaTokenizer> tokenizer;
     static std::unique_ptr<OgaGeneratorParams> params;

@@ -4,18 +4,20 @@
 #include <ort_genai_c.h>
 #include <ort_genai.h>
 
-std::unique_ptr<OgaGenerator> AI::generator = nullptr;
 std::unique_ptr<OgaModel> AI::model = nullptr;
 std::unique_ptr<OgaTokenizer> AI::tokenizer = nullptr;
 std::unique_ptr<OgaGeneratorParams> AI::params = nullptr;
 
 void AI::Initialize()
 {
-    model = OgaModel::Create("model");
+    if (model != nullptr)
+    {
+        return;
+    }
+    model = OgaModel::Create("/data/data/com.example.quickmaths/files/model");
     tokenizer = OgaTokenizer::Create(*model);
     params = OgaGeneratorParams::Create(*model);
     params->SetSearchOption("max_length", 200);
-    generator = OgaGenerator::Create(*model, *params);
 }
 
 std::string AI::Generate(std::string input)
@@ -43,6 +45,7 @@ std::string AI::Generate(std::string input)
                         input);
     input = std::format("<|user|>\n{} <|end|>\n<|assistant|>", input);
     tokenizer->Encode(input.c_str(), *sequences);
+    auto generator = OgaGenerator::Create(*model, *params);
     generator->AppendTokenSequences(*sequences);
     while (!generator->IsDone())
     {
@@ -73,7 +76,6 @@ std::string AI::GetOutput(const std::string &input)
 
 void AI::Shutdown()
 {
-    generator.reset();
     params.reset();
     tokenizer.reset();
     model.reset();
