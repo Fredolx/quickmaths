@@ -1,55 +1,66 @@
 #include "ai.hpp"
 #include <iostream>
 #include <format>
-#include <ort_genai_c.h>
-#include <ort_genai.h>
+#include "llama.h"
 
-std::unique_ptr<OgaModel> AI::model = nullptr;
-std::unique_ptr<OgaTokenizer> AI::tokenizer = nullptr;
-std::unique_ptr<OgaGeneratorParams> AI::params = nullptr;
+llama_model *AI::model = nullptr;
+const llama_vocab *AI::vocab;
 
 void AI::Initialize()
 {
-    if (model != nullptr)
-    {
-        std::cout << "Initialized skipped" << std::endl;
-        return;
-    }
-    model = OgaModel::Create("/data/data/com.example.quickmaths/files/model");
-    tokenizer = OgaTokenizer::Create(*model);
-    params = OgaGeneratorParams::Create(*model);
-    params->SetSearchOption("max_length", 250);
-    std::cout << "Initialized model" << std::endl;
+    // std::string model_path = "/data/data/com.example.quickmaths/files/model.gguf";
+    std::string model_path = "AceMath-1.5B-Instruct.i1-Q4_K_M.gguf";
+    ggml_backend_load_all();
+    llama_model_params model_params = llama_model_default_params();
+    model_params.n_gpu_layers = ngl;
+    AI::model = llama_model_load_from_file(model_path.c_str(), model_params);
+    AI::vocab = llama_model_get_vocab(model);
 }
 
-std::string AI::Generate(std::string input)
+std::string AI::Generate(std::string prompt)
 {
-    auto sequences = OgaSequences::Create();
-    input = std::format(R"(
-        Convert the following text into a computer-readable mathematical equation.
-        Output only the equation, without any explanation.
-        Input: What is the % increase of 5 to 10
-        Output: (10 - 5) / 5 * 100
-        Input: 5 ounces to pounds
-        Output: 5 / 16
-        Input: 20$ for 5 ounces in $/lb
-        Output: 20 / (5 / 16)
-        Input: 24 pounds for 36$ in $/lb
-        Output: 36 / 24
-        Input: 5 lb to kg
-        Out)",
-                        input);
-    input = std::format("<|user|>{}\n <|end|>\n<|assistant|>", input);
-    tokenizer->Encode(input.c_str(), *sequences);
-    auto generator = OgaGenerator::Create(*model, *params);
-    generator->AppendTokenSequences(*sequences);
-    while (!generator->IsDone())
+    prompt = systemMessage + prompt;
+    std::cout << prompt << std::endl;
+    llama_context_params ctx_params = llama_context_default_params();
+    ctx_params.n_ctx = 4096;
+    ctx_params.n_batch = 128;
+    llama_context *ctx = llama_init_from_model(model, ctx_params);
+    const char *tmpl = llama_model_chat_template(model, nullptr);
+    std::vector<llama_chat_message> messages;
+    std::vector<char> formatted(llama_n_ctx(ctx));
+    messages.push_back({"user", strdup(prompt.c_str())});
+    auto new_len = llama_chat_apply_template(tmpl, messages.data(), messages.size(), true, formatted.data(), formatted.size());
+    prompt = std::string(formatted.begin(), formatted.begin() + new_len);
+    const int n_prompt_tokens = -llama_tokenize(vocab, prompt.c_str(), prompt.size(), NULL, 0, true, true);
+    std::vector<llama_token> prompt_tokens(n_prompt_tokens);
+    llama_tokenize(vocab, prompt.c_str(), prompt.size(), prompt_tokens.data(), prompt_tokens.size(), true, true);
+    llama_batch batch = llama_batch_get_one(prompt_tokens.data(), prompt_tokens.size());
+    auto sparams = llama_sampler_chain_default_params();
+    llama_sampler *smpl = llama_sampler_chain_init(sparams);
+    llama_sampler_chain_add(smpl, llama_sampler_init_greedy());
+    int n_decode = 0;
+    llama_token new_token_id;
+    std::string final;
+    for (int n_pos = 0; n_pos + batch.n_tokens < n_prompt_tokens + n_predict;)
     {
-        generator->GenerateNextToken();
+        llama_decode(ctx, batch);
+        n_pos += batch.n_tokens;
+        {
+            new_token_id = llama_sampler_sample(smpl, ctx, -1);
+            if (llama_vocab_is_eog(vocab, new_token_id))
+            {
+                break;
+            }
+            char buf[128];
+            int n = llama_token_to_piece(vocab, new_token_id, buf, sizeof(buf), 0, true);
+            final += std::string(buf, n);
+            batch = llama_batch_get_one(&new_token_id, 1);
+            n_decode += 1;
+        }
     }
-    auto output_sequence = generator->GetSequenceData(0);
-    auto output_string = tokenizer->Decode(output_sequence, generator->GetSequenceCount(0));
-    return GetOutput(std::string(output_string.p_));
+    llama_sampler_free(smpl);
+    llama_free(ctx);
+    return final;
 }
 
 std::string AI::Trim(const std::string &str)
@@ -72,8 +83,5 @@ std::string AI::GetOutput(const std::string &input)
 
 void AI::Shutdown()
 {
-    params.reset();
-    tokenizer.reset();
-    model.reset();
-    OgaShutdown();
+    llama_model_free(model);
 }

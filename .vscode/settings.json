@@ -60,6 +60,9 @@
         "vector": "cpp",
         "algorithm": "cpp",
         "charconv": "cpp",
-        "forward_list": "cpp"
-    }
+        "forward_list": "cpp",
+        "format": "cpp",
+        "future": "cpp"
+    },
+    "cmake.sourceDirectory": "/Users/fred/git/quickmaths/lib-ai"
 }
